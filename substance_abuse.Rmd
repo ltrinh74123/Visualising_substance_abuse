@@ -5,7 +5,518 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
+```{r echo=, message=FALSE, warning=FALSE}
+library(sf)
+library(rgdal)
+library(readxl)
+library(tidyverse)
+library(leaflet)
+```
+
 ```{r}
-library(geojsonio)
+library(rgdal)
+aussie_spdf <- readOGR( 
+  dsn= paste0(getwd(),"/data/GCCSA_2021_AUST_SHP_GDA2020/") , 
+  layer="GCCSA_2021_AUST_GDA2020",
+  verbose=FALSE
+)
+
+aussie_spdf@data
+```
+
+```{r}
+drug_abuse = readxl::read_xlsx('data/2021_13 Drug and alcohol-induced deaths (Australia).xlsx', sheet = 7)
+drug_abuse  = drug_abuse %>% as.data.frame()
+drug_abuse = drug_abuse[-c(1:5), c(1:6)] 
+years = drug_abuse[c(1),] %>% unlist()
+years = as.vector(years) %>% na.omit()
+years = years %>% c()
+colnames(drug_abuse) = c("GCC_NAME21", years)
+drug_abuse = drug_abuse %>% na.omit()
+aussie_spdf$GCC_NAME21 = aussie_spdf$GCC_NAME21 %>% recode("Rest of Vic." = "Rest of Vic",
+                                                           "Rest of Tas." = "Rest of Tasmania")
+merged_data <- aussie_spdf@data %>%left_join(drug_abuse, by = c("GCC_NAME21" = "GCC_NAME21"))
+merged_data$`2017` = as.numeric(merged_data$`2017`)
+
+aussie_spdf@data = merged_data
+aussie_sf <- st_as_sf(aussie_spdf, wkt = "geometry")
+```
+
+
+```{r}
+library(rmapshaper)
+aussie_sf_simplied = ms_simplify(aussie_sf, keep = 0.001,
+                                keep_shapes = FALSE) %>% drop_na()
+
+aussie_sf_simplied <- st_transform(aussie_sf_simplied, crs = st_crs("+proj=longlat +datum=WGS84"))
+# long_aussie_sf <- pivot_longer(
+#   data = aussie_sf_simplied,
+#   cols = starts_with("20"),  # Columns to pivot
+#   names_to = "year",             # New column name for years
+#   values_to = "deaths"            # New column name for values
+#   )
+# long_aussie_sf$year = as.numeric(long_aussie_sf$year)
+```
+
+```{r}
+export_path <- "data/simplified_data/assuie_sf.shp"
+st_write(long_aussie_sf, export_path, append = FALSE)
+
+```
+
+
+```{r}
+# drug_states = left_join(aussie_spdf, drug_abuse)
+
+mylabels <- paste(
+  "<strong>", aussie_sf_simplied$GCC_NAME21, "</strong>", 
+  "<br/>", "Drug induced deaths: ", aussie_sf_simplied$`yr2017`) %>%
+  lapply(htmltools::HTML)
+
+
+pal <- colorNumeric(
+  palette = "plasma",
+  domain = aussie_sf_simplied$`yr2017`,
+  reverse = TRUE)
+
+
+m = leaflet(aussie_sf_simplied) %>%
+  addPolygons(stroke = TRUE, 
+              fillOpacity = 0.5,
+              color = 'black',
+              dashArray = "3",
+              weight = 1,
+              fillColor = ~pal(`2017`),
+              highlightOptions = highlightOptions(
+                weight = 3,
+                color = "navy",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              label = mylabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", 
+                             padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+  addProviderTiles(providers$CartoDB.Positron)
+
+m %>% addLegend(pal = pal, values = ~`2017`, opacity = 0.7, title = NULL,
+  position = "bottomright") %>% setView(lng = 133.0, lat = -25.0, zoom = 4)
+
+```
+
+#change of plans: Do it by states
+```{r}
+library(rgdal)
+aussie_spdf <- readOGR( 
+  dsn= paste0(getwd(),"/data/STE_2021_AUST_SHP_GDA2020/") , 
+  layer="STE_2021_AUST_GDA2020",
+  verbose=FALSE
+)
+
+aussie_states = c(aussie_spdf@data$STE_NAME21 %>% unique())
+```
+
+```{r}
+drug_abuse = readxl::read_xlsx('data/2021_13 Drug and alcohol-induced deaths (Australia).xlsx', sheet = 7)
+drug_abuse  = drug_abuse %>% as.data.frame()
+drug_abuse = drug_abuse[-c(1:5), c(1:6)] 
+years = drug_abuse[c(1),] %>% unlist()
+years = as.vector(years) %>% na.omit()
+years = years %>% c()
+colnames(drug_abuse) = c("states", years)
+drug_abuse = drug_abuse %>% na.omit()
+drug_abuse$`2017` = as.numeric(drug_abuse$`2017`)
+
+drug_abuse = drug_abuse %>% filter(states %in% aussie_states)
+
+drug_abuse = drug_abuse %>% 
+  reframe(states = states, total_deaths = rowSums(drug_abuse[,2:6]))
+
+merged_data <- aussie_spdf@data %>%left_join(drug_abuse, by = c("STE_NAME21" = "states"))
+aussie_spdf@data = merged_data
+aussie_spdf <- st_as_sf(aussie_spdf, wkt = "geometry")
+
+```
+
+```{r}
+library(rmapshaper)
+aussie_sf_simplied = ms_simplify(aussie_spdf, keep = 0.01,
+                                keep_shapes = FALSE) %>% drop_na()
+
+aussie_sf_simplied <- st_transform(aussie_sf_simplied, crs = st_crs("+proj=longlat +datum=WGS84"))
+```
+
+```{r}
+# drug_states = left_join(aussie_spdf, drug_abuse)
+
+mylabels <- paste(
+  "<strong>", aussie_sf_simplied$STE_NAME21, "</strong>", 
+  "<br/>", "Drug induced deaths: ", aussie_sf_simplied$total_deaths) %>%
+  lapply(htmltools::HTML)
+
+
+pal <- colorNumeric(
+  palette = "plasma",
+  domain = aussie_sf_simplied$total_deaths,
+  reverse = TRUE)
+
+
+m = leaflet(aussie_sf_simplied) %>%
+  addPolygons(stroke = TRUE, 
+              fillOpacity = 0.5,
+              color = 'black',
+              dashArray = "3",
+              weight = 1,
+              fillColor = ~pal(total_deaths),
+              highlightOptions = highlightOptions(
+                weight = 3,
+                color = "navy",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              label = mylabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", 
+                             padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto")) %>%
+  addProviderTiles(providers$CartoDB.Positron)
+
+m %>% addLegend(pal = pal, 
+                values = ~total_deaths, 
+                opacity = 0.7,
+                position = "bottomright", 
+                title = "Number of deaths") %>% 
+  setView(lng = 133.0, lat = -25.0, zoom = 4)
+
+```
+
+```{r}
+export_path <- "data/simplified_data/aussie_state_sf.shp"
+st_write(aussie_sf_simplied, export_path, append = FALSE)
+
+```
+
+```{r}
+recent_drug_type = read_xlsx("data/aihw-phe-270-s-state-fact-sheet-tables.xlsx", sheet = "Table S.29")
+states = recent_drug_type[3,] %>% unlist() %>% unique()
+states = states[!is.na(states)]
+states = states %>% recode("NSW" = "New South Wales", 
+                           "Vic" = "Victoria",
+                           "Qld" = "Queensland",
+                           "WA" = "Western Australia",
+                           "SA" = "South Australia",
+                           "NT" = "Northern Territory",
+                           "ACT" = "Australian Capital Territory",
+                           "Tas" = "Tasmania"
+                          )
+states_2001 = rep(states,each = 7)
+
+year = recent_drug_type[4,] %>% unlist() %>% c()
+year = year[-1]
+year_states = paste(year, states_2001, sep= ",")
+recent_drug_type = recent_drug_type [8:16,]
+colnames(recent_drug_type) = c("drug", year_states)
+recent_drug_type$drug = recent_drug_type$drug %>% recode("Meth/amphetamine(e)" = "Meth")
+recent_drug_type = recent_drug_type[!recent_drug_type$drug == "GHB" , ]
+
+
+recent_drug_type = pivot_longer(recent_drug_type, cols = -drug, names_to = c("Year, State"), values_to = "proportion")
+recent_drug_type$proportion =  gsub("[*#]", "", recent_drug_type$proportion)
+recent_drug_type$proportion =  gsub("\\*\\*", "", recent_drug_type$proportion)
+recent_drug_type$proportion = gsub('<0.1', NA, recent_drug_type$proportion)
+recent_drug_type$proportion = gsub('n.p.', NA, recent_drug_type$proportion)
+recent_drug_type$proportion = gsub('n.a.', NA, recent_drug_type$proportion)
+
+recent_drug_type$proportion = as.numeric(recent_drug_type$proportion)
+recent_drug_type <- separate(recent_drug_type, col = `Year, State`, into = c("Year", "State"), sep = ",")
+recent_drug_type = recent_drug_type %>% pivot_wider(names_from = drug, values_from = proportion)
+recent_drug_type = recent_drug_type %>% filter(year >= "2007")
+```
+
+
+
+
+```{r}
+library(plotly)
+recent_drug_type_nsw = recent_drug_type %>% filter(State == "New South Wales")
+
+
+
+```
+
+```{r}
+
+plot_ly(data = recent_drug_type_nsw, x=~Year, y = ~Cannabis, 
+        name = "Cannabis",
+        type = "scatter", mode = "lines",
+        line = list(color = 'red', 
+                    width = 4)) %>%
+  add_trace(y = ~Ecstasy, 
+            name = "Ecstasy", 
+            line = list(color = "blue",
+                        width = 4)) %>%
+  add_trace(y = ~Meth, 
+            name = "Meth",
+            line = list(color = "cyan"))
+  
+```
+
+
+
+
+```{r}
+initialised_age = read_xlsx("data/aihw-phe-270-s-state-fact-sheet-tables.xlsx", sheet = "Table S.31")
+
+year_2007 = initialised_age[4,] %>% unlist() %>% c()
+year_2007 = year_2007[-1]
+states_2007 = rep(states, each = 5)
+year_states_2007 = paste(year_2007, states_2007, sep= ",")
+
+initialised_age = initialised_age[8:15,]
+colnames(initialised_age) = c("drug", year_states_2007)
+initialised_age$drug = initialised_age$drug %>% recode("Meth/amphetamine(c)" = "Meth")
+initialised_age$drug = c(paste(initialised_age$drug, "mean_age", sep = "_"))
+
+initialised_age = initialised_age %>% pivot_longer(cols = -drug, names_to = "year, states", values_to = "age")
+initialised_age$age = gsub("[`#]", "", initialised_age$age) %>% 
+  gsub("\\`\\`", "",.) %>% gsub("n.p.", NA, .) %>%
+  as.numeric()
+
+initialised_age  = initialised_age %>% separate(col = "year, states", into = c("Year", "State"), sep = ",")
+initialised_age = initialised_age %>% pivot_wider(names_from = drug, values_from = age)
+initialised_age
+```
+
+
+```{r}
+drug_type_age = left_join(recent_drug_type, initialised_age, by= c("Year", "State"))
+drug_type_age
+```
+
+```{r, fig.width= 14}
+nsw_drug_type_age = drug_type_age %>% filter(State == "New South Wales") %>% select(Year, Cannabis, Cannabis_mean_age)
+max_mean_age = max(nsw_drug_type_age$Cannabis_mean_age)
+max_usage = max(nsw_drug_type_age$Cannabis)
+fig = plot_ly(data = nsw_drug_type_age,
+        x = ~Year,
+        y = ~Cannabis,
+        type = "bar",
+        name = "Proportion of recent usage",
+        marker = list(color = '#b2e061')
+        )  %>% 
+  add_trace(x = ~Year, 
+            y = ~Cannabis_mean_age, 
+            name = "age",
+            type = "scatter",
+            mode = "lines+markers",
+            yaxis = "y2",
+            line = list(color = "#ffb55a"),    # Change line color
+            marker = list(color = "#ffb55a"))
+
+
+  
+ay <- list(
+  overlaying = "y",
+  side = "right",
+  title = list(text = "Mean Initialisation Age", font = list(color = "lightgrey")),
+  range = c(0, max_mean_age *1.2),
+  gridcolor = 'rgba(200, 200, 200, 0)',
+  tickcolor = 'lightgrey',
+  linecolor = "lightgrey",
+  tickfont = list(color = "lightgrey"),
+  showline = TRUE)
+
+fig = fig %>% layout(title = list(text ="Proportion of recent users and average initialzation age",
+                                  font = list(color = "lightgrey")),
+                     paper_bgcolor='#282B30', plot_bgcolor='#282B30',
+                     yaxis2 = ay, 
+                     xaxis = list(title = list(text = "Years", font = list(color = "lightgrey")),
+                                  tickcolor = 'lightgrey',
+                                  linecolor = "lightgrey",
+                                  tickfont = list(color = "lightgrey"),
+                                  showline = TRUE),
+
+                     yaxis = list(title = list(text = "Proportion of Recent Usage (%)", 
+                                               font = list(color = "lightgrey")),
+                                  range = c(0, max_usage *1.2),
+                                  tickcolor = 'lightgrey',
+                                  linecolor = "lightgrey",
+                                  tickfont = list(color = "lightgrey"),
+                                  gridcolor = 'rgba(200, 200, 200, 0.2)',
+                                  showline = TRUE),
+                     margin = list(r = 80, t = 50),
+                     legend = list(font = list(color = "lightgrey")))
+fig %>%
+  layout(legend = list(orientation = 'h'))
+
+```
+
+```{r}
+age_group  = read_xlsx("data/aihw-phe-270-s-state-fact-sheet-tables.xlsx", sheet = "Table S.28")
+age_group = age_group[5:11,]
+colnames(age_group) = c("Age_group", year_states_2007)
+
+
+for (col in colnames(age_group[-1])) {
+  age_group[[col]] = gsub("[*]+", "", age_group[[col]]) %>%
+    gsub("#", "", .) %>%
+    gsub("n.p.", NA, .) %>%
+    as.numeric(.)
+}
+
+age_group = age_group %>% pivot_longer(cols = -Age_group, names_to = "year, states", values_to = "proportion")
+age_group = age_group %>% separate(col = "year, states", into = c("Year", "State"), sep = ",")
+age_group_wide = age_group %>% pivot_wider(names_from =Age_group, values_from = proportion)
+
+```
+```{r}
+age_group_nsw = age_group %>% filter(State == "New South Wales")
+
+ggplot(data = age_group_nsw) + geom_line(aes(x = Year, y = proportion, color = Age_group))
+
+```
+
+```{r}
+age_group_nsw = filter(age_group_wide, State == "New South Wales")
+max_age_nsw = age_group_nsw[,3:9] %>% as.matrix() %>% max()
+
+plot_ly() %>% add_trace(data = age_group_nsw, 
+                        x = ~Year,
+                        y = ~`14–17`,
+                        type ="scatter",
+                        mode = "lines",
+                        name = "14-17", 
+                        connectgaps = TRUE,
+                        line = list(color = "#fd7f6f", width = 3)) %>% 
+  add_trace(data = age_group_nsw, 
+            x = ~Year,
+            y = ~`18–24`,
+            type ="scatter",
+            mode = "lines",
+            name = "18-24", 
+            connectgaps = TRUE,
+            line = list(color = "#7eb0d5", width = 3)) %>%
+  add_trace(data = age_group_nsw, 
+            x = ~Year,
+            y = ~`25–29`,
+            type ="scatter",
+            mode = "lines",
+            name = "25–29", 
+            connectgaps = TRUE,
+            line = list(color = "#b2e061", width = 3)) %>%
+  add_trace(data = age_group_nsw, 
+            x = ~Year,
+            y = ~`30–39`,
+            type ="scatter",
+            mode = "lines",
+            name = "30–39", 
+            connectgaps = TRUE,
+            line = list(color = "#bd7ebe", width = 3)) %>%
+  add_trace(data = age_group_nsw, 
+            x = ~Year,
+            y = ~`40–49`,
+            type ="scatter",
+            mode = "lines",
+            name = "40–49", 
+            connectgaps = TRUE,
+            line = list(color = '#ffb55a', width = 3)) %>%
+  add_trace(data = age_group_nsw,
+            x = ~Year,
+            y = ~`50–59`,
+            type ="scatter",
+            mode = "lines",
+            name = "50-59", 
+            connectgaps = TRUE,
+            line = list(color = "#fdcce5", width = 3)) %>%
+  add_trace(data = age_group_nsw,
+            x = ~Year,
+            y = ~`60+`,
+            type ="scatter",
+            mode = "lines",
+            name = "60+", 
+            connectgaps = TRUE,
+            line = list(color = "#8bd3c7", width = 3)) %>%
+  layout(yaxis = list(range = c(0, max_age_nsw *1.2))) %>%
+  layout(title = list(text ="Proportion of illict drug users based on age", font = list(color = "lightgrey")),
+         margin = list(t = 50, b= 70),
+         paper_bgcolor='#282B30', plot_bgcolor='#282B30',
+         xaxis = list(title = list(text = "Years", font = list(color = "lightgrey")),
+                      gridcolor = 'rgba(200, 200, 200, 0.2)' ,
+                      showgrid = T,
+                      showline = TRUE,
+                      showticklabels = TRUE,
+                      tickcolor = 'lightgrey',
+                      linecolor = "lightgrey",
+                      tickfont = list(color = "lightgrey"),
+                      ticks = 'outside',
+                      zeroline = TRUE),
+         yaxis = list(title = list(text = "Proportion (%)", font = list(color = "lightgrey")),
+                      gridcolor = 'rgba(200, 200, 200, 0.2)' ,
+                      showgrid = TRUE,
+                      showline = T,
+                      showticklabels = TRUE,
+                      tickcolor = 'lightgrey',
+                      linecolor = "lightgrey",
+                      tickfont = list(color = "lightgrey"),
+                      ticks = 'outside',
+                      zeroline = TRUE),
+         legend = list(font = list(color = "lightgrey")))
+```
+
+
+
+```{r}
+recent_gender = read_xlsx("data/aihw-phe-270-s-state-fact-sheet-tables.xlsx", sheet = "Table S.25")
+recent_gender = recent_gender[5:6,]
+
+for (col in colnames(recent_gender[-1])) {
+  recent_gender[[col]] = gsub("#", "", recent_gender[[col]]) %>%
+    as.numeric(.)
+}
+colnames(recent_gender) = c("gender", year_states_2007)
+recent_gender = recent_gender %>% pivot_longer(cols = -gender, names_to = "year, states", values_to = "proportion")
+recent_gender = recent_gender %>% separate(col = `year, states`, into = c("Year", "State"), sep = ",")
+recent_gender = recent_gender %>% pivot_wider(names_from = gender, values_from = proportion)
+```
+
+```{r}
+gender_nsw = recent_gender %>% filter(State == "New South Wales")
+plot_ly(data = gender_nsw) %>% 
+  add_trace(x = ~Year, 
+            y = ~Males,
+            type = 'bar',
+            name = "Male",
+            text = ~Males,
+            marker = list(color = '#7eb0d5')) %>%
+  add_trace(x = ~Year,
+            y = ~Females,
+            type = 'bar',
+            name = "Female",
+            text = ~Females,
+            marker = list(color = "#fd7f6f")) %>% 
+  layout(title = list(text ='Proportion of gender taking illicit drugs recently', font = list(color = "lightgrey")),
+         paper_bgcolor='#282B30', plot_bgcolor='#282B30',
+         xaxis = list(
+           title = list(text = "Years", font = list(color = "lightgrey")),
+           tickcolor = 'lightgrey',
+           linecolor = "lightgrey",
+           tickfont = list(color = "lightgrey")),
+         yaxis = list(
+           title = list(text = "Proportion (%)", font = list(color = "lightgrey")),
+           gridcolor = 'rgba(200, 200, 200, 0.2)' ,
+                      showgrid = TRUE,
+                      showline = T,
+                      showticklabels = TRUE,
+                      tickcolor = 'lightgrey',
+                      linecolor = "lightgrey",
+                      tickfont = list(color = "lightgrey"),
+                      ticks = 'outside',
+                      zeroline = TRUE),
+         barmode = 'group', bargap = 0.15, bargroupgap = 0.1,
+         margin = list(t = 50, b = 70),
+         legend = list(font = list(color = "lightgrey")))
 
 ```
