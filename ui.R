@@ -88,8 +88,8 @@ navbarPage("Profilling Substance Usage in Australia",
                           solidHeader = T,
                           status = "primary",
                           title = "Proportion of recent users and average starting age for lifelong use",
-                          "If there is no bar or line in the a year, 
-                          then there is an insignificant amount of data to be accurately used"),
+                          "There is a negligible amount of data that can be correctly utilised 
+                          if there is no bar or line for a given year on the graph."),
                           
                           box(
                             
@@ -97,7 +97,7 @@ navbarPage("Profilling Substance Usage in Australia",
                             solidHeader = T,
                             title = "Proportion of substance users based on age groups",
                             status = "primary",
-                            'For easier comparasion, click on the different legends to select/deselect any age groups',
+                            'Click on the various legends to select or deselect any age groups for simpler comparison.',
                             width = 6                          
                             )
                           
