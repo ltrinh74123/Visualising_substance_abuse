@@ -4,6 +4,9 @@ This is a submission to USYD's Matildas Data Visualisation where we were suppose
 
 In terms of experience, this is my second time using Shiny to create an interactive dashboard, where I tried exploring the different UI options and making my own CSS for the color schemes for a 'dark mode' as I wasn't confident to do it before in my first project. Moreover, rather than using the different ways to select an input such as buttons or slider that is integrated into Shiny UI, I wanted to experiment with capturing the user's mouse movement and using that as an input which can be seen by clicking on the different states in the map.
 
+Possible next steps
+* Incorporate crime data into the heat map as a different layer.
+
 Link to shiny app:
 https://ltrinh74123.shinyapps.io/Visualising_substance_abuse/
 
