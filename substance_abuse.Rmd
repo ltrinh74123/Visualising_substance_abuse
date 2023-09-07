@@ -14,41 +14,42 @@ library(leaflet)
 ```
 
 ```{r}
-library(rgdal)
-aussie_spdf <- readOGR( 
-  dsn= paste0(getwd(),"/data/GCCSA_2021_AUST_SHP_GDA2020/") , 
-  layer="GCCSA_2021_AUST_GDA2020",
-  verbose=FALSE
-)
-
-aussie_spdf@data
+# getwd()
+# library(rgdal)
+# aussie_spdf <- readOGR( 
+#   dsn= paste0(getwd(),"/data/GCCSA_2021_AUST_SHP_GDA2020/") , 
+#   layer="GCCSA_2021_AUST_GDA2020",
+#   verbose=FALSE
+# )
+# 
+# aussie_spdf@data
 ```
 
 ```{r}
-drug_abuse = readxl::read_xlsx('data/2021_13 Drug and alcohol-induced deaths (Australia).xlsx', sheet = 7)
-drug_abuse  = drug_abuse %>% as.data.frame()
-drug_abuse = drug_abuse[-c(1:5), c(1:6)] 
-years = drug_abuse[c(1),] %>% unlist()
-years = as.vector(years) %>% na.omit()
-years = years %>% c()
-colnames(drug_abuse) = c("GCC_NAME21", years)
-drug_abuse = drug_abuse %>% na.omit()
-aussie_spdf$GCC_NAME21 = aussie_spdf$GCC_NAME21 %>% recode("Rest of Vic." = "Rest of Vic",
-                                                           "Rest of Tas." = "Rest of Tasmania")
-merged_data <- aussie_spdf@data %>%left_join(drug_abuse, by = c("GCC_NAME21" = "GCC_NAME21"))
-merged_data$`2017` = as.numeric(merged_data$`2017`)
-
-aussie_spdf@data = merged_data
-aussie_sf <- st_as_sf(aussie_spdf, wkt = "geometry")
+# drug_abuse = readxl::read_xlsx('data/2021_13 Drug and alcohol-induced deaths (Australia).xlsx', sheet = 7)
+# drug_abuse  = drug_abuse %>% as.data.frame()
+# drug_abuse = drug_abuse[-c(1:5), c(1:6)] 
+# years = drug_abuse[c(1),] %>% unlist()
+# years = as.vector(years) %>% na.omit()
+# years = years %>% c()
+# colnames(drug_abuse) = c("GCC_NAME21", years)
+# drug_abuse = drug_abuse %>% na.omit()
+# aussie_spdf$GCC_NAME21 = aussie_spdf$GCC_NAME21 %>% recode("Rest of Vic." = "Rest of Vic",
+#                                                            "Rest of Tas." = "Rest of Tasmania")
+# merged_data <- aussie_spdf@data %>%left_join(drug_abuse, by = c("GCC_NAME21" = "GCC_NAME21"))
+# merged_data$`2017` = as.numeric(merged_data$`2017`)
+# 
+# aussie_spdf@data = merged_data
+# aussie_sf <- st_as_sf(aussie_spdf, wkt = "geometry")
 ```
 
 
 ```{r}
 library(rmapshaper)
-aussie_sf_simplied = ms_simplify(aussie_sf, keep = 0.001,
-                                keep_shapes = FALSE) %>% drop_na()
-
-aussie_sf_simplied <- st_transform(aussie_sf_simplied, crs = st_crs("+proj=longlat +datum=WGS84"))
+# aussie_sf_simplied = ms_simplify(aussie_sf, keep = 0.001,
+#                                 keep_shapes = FALSE) %>% drop_na()
+# 
+# aussie_sf_simplied <- st_transform(aussie_sf_simplied, crs = st_crs("+proj=longlat +datum=WGS84"))
 # long_aussie_sf <- pivot_longer(
 #   data = aussie_sf_simplied,
 #   cols = starts_with("20"),  # Columns to pivot
@@ -59,50 +60,50 @@ aussie_sf_simplied <- st_transform(aussie_sf_simplied, crs = st_crs("+proj=longl
 ```
 
 ```{r}
-export_path <- "data/simplified_data/assuie_sf.shp"
-st_write(long_aussie_sf, export_path, append = FALSE)
+# export_path <- "data/simplified_data/assuie_sf.shp"
+# st_write(long_aussie_sf, export_path, append = FALSE)
 
 ```
 
 
 ```{r}
 # drug_states = left_join(aussie_spdf, drug_abuse)
-
-mylabels <- paste(
-  "<strong>", aussie_sf_simplied$GCC_NAME21, "</strong>", 
-  "<br/>", "Drug induced deaths: ", aussie_sf_simplied$`yr2017`) %>%
-  lapply(htmltools::HTML)
-
-
-pal <- colorNumeric(
-  palette = "plasma",
-  domain = aussie_sf_simplied$`yr2017`,
-  reverse = TRUE)
-
-
-m = leaflet(aussie_sf_simplied) %>%
-  addPolygons(stroke = TRUE, 
-              fillOpacity = 0.5,
-              color = 'black',
-              dashArray = "3",
-              weight = 1,
-              fillColor = ~pal(`2017`),
-              highlightOptions = highlightOptions(
-                weight = 3,
-                color = "navy",
-                dashArray = "",
-                fillOpacity = 0.7,
-                bringToFront = TRUE),
-              label = mylabels,
-              labelOptions = labelOptions(
-                style = list("font-weight" = "normal", 
-                             padding = "3px 8px"),
-                textsize = "15px",
-                direction = "auto")) %>%
-  addProviderTiles(providers$CartoDB.Positron)
-
-m %>% addLegend(pal = pal, values = ~`2017`, opacity = 0.7, title = NULL,
-  position = "bottomright") %>% setView(lng = 133.0, lat = -25.0, zoom = 4)
+# 
+# mylabels <- paste(
+#   "<strong>", aussie_sf_simplied$GCC_NAME21, "</strong>", 
+#   "<br/>", "Drug induced deaths: ", aussie_sf_simplied$`yr2017`) %>%
+#   lapply(htmltools::HTML)
+# 
+# 
+# pal <- colorNumeric(
+#   palette = "plasma",
+#   domain = aussie_sf_simplied$`yr2017`,
+#   reverse = TRUE)
+# 
+# 
+# m = leaflet(aussie_sf_simplied) %>%
+#   addPolygons(stroke = TRUE, 
+#               fillOpacity = 0.5,
+#               color = 'black',
+#               dashArray = "3",
+#               weight = 1,
+#               fillColor = ~pal(`2017`),
+#               highlightOptions = highlightOptions(
+#                 weight = 3,
+#                 color = "navy",
+#                 dashArray = "",
+#                 fillOpacity = 0.7,
+#                 bringToFront = TRUE),
+#               label = mylabels,
+#               labelOptions = labelOptions(
+#                 style = list("font-weight" = "normal", 
+#                              padding = "3px 8px"),
+#                 textsize = "15px",
+#                 direction = "auto")) %>%
+#   addProviderTiles(providers$CartoDB.Positron)
+# 
+# m %>% addLegend(pal = pal, values = ~`2017`, opacity = 0.7, title = NULL,
+#   position = "bottomright") %>% setView(lng = 133.0, lat = -25.0, zoom = 4)
 
 ```
 
@@ -146,6 +147,8 @@ aussie_sf_simplied = ms_simplify(aussie_spdf, keep = 0.01,
                                 keep_shapes = FALSE) %>% drop_na()
 
 aussie_sf_simplied <- st_transform(aussie_sf_simplied, crs = st_crs("+proj=longlat +datum=WGS84"))
+aussie_sf_simplied =aussie_sf_simplied %>% select(STE_NAME21, total_deaths, geometry)
+
 ```
 
 ```{r}
@@ -194,8 +197,9 @@ m %>% addLegend(pal = pal,
 ```
 
 ```{r}
-export_path <- "data/simplified_data/aussie_state_sf.shp"
-st_write(aussie_sf_simplied, export_path, append = FALSE)
+# colnames(aussie_sf_simplied) = c("state", "deaths", "geometry")
+# export_path <- "data/cleaned_data/aussie_state_sf.shp"
+# st_write(aussie_sf_simplied, export_path, append = FALSE)
 
 ```
 
@@ -217,13 +221,13 @@ states_2001 = rep(states,each = 7)
 year = recent_drug_type[4,] %>% unlist() %>% c()
 year = year[-1]
 year_states = paste(year, states_2001, sep= ",")
-recent_drug_type = recent_drug_type [8:16,]
+recent_drug_type = recent_drug_type [8:14,]
 colnames(recent_drug_type) = c("drug", year_states)
 recent_drug_type$drug = recent_drug_type$drug %>% recode("Meth/amphetamine(e)" = "Meth")
 recent_drug_type = recent_drug_type[!recent_drug_type$drug == "GHB" , ]
 
 
-recent_drug_type = pivot_longer(recent_drug_type, cols = -drug, names_to = c("Year, State"), values_to = "proportion")
+recent_drug_type = pivot_longer(recent_drug_type, cols = -drug, names_to = c("year, state"), values_to = "proportion")
 recent_drug_type$proportion =  gsub("[*#]", "", recent_drug_type$proportion)
 recent_drug_type$proportion =  gsub("\\*\\*", "", recent_drug_type$proportion)
 recent_drug_type$proportion = gsub('<0.1', NA, recent_drug_type$proportion)
@@ -231,41 +235,12 @@ recent_drug_type$proportion = gsub('n.p.', NA, recent_drug_type$proportion)
 recent_drug_type$proportion = gsub('n.a.', NA, recent_drug_type$proportion)
 
 recent_drug_type$proportion = as.numeric(recent_drug_type$proportion)
-recent_drug_type <- separate(recent_drug_type, col = `Year, State`, into = c("Year", "State"), sep = ",")
+recent_drug_type <- separate(recent_drug_type, col = `year, state`, into = c("year", "state"), sep = ",")
 recent_drug_type = recent_drug_type %>% pivot_wider(names_from = drug, values_from = proportion)
-recent_drug_type = recent_drug_type %>% filter(year >= "2007")
-```
-
-
-
-
-```{r}
-library(plotly)
-recent_drug_type_nsw = recent_drug_type %>% filter(State == "New South Wales")
-
-
+recent_drug_type = recent_drug_type %>% filter(year >= "2007") 
+recent_drug_type$label = "proportion"
 
 ```
-
-```{r}
-
-plot_ly(data = recent_drug_type_nsw, x=~Year, y = ~Cannabis, 
-        name = "Cannabis",
-        type = "scatter", mode = "lines",
-        line = list(color = 'red', 
-                    width = 4)) %>%
-  add_trace(y = ~Ecstasy, 
-            name = "Ecstasy", 
-            line = list(color = "blue",
-                        width = 4)) %>%
-  add_trace(y = ~Meth, 
-            name = "Meth",
-            line = list(color = "cyan"))
-  
-```
-
-
-
 
 ```{r}
 initialised_age = read_xlsx("data/aihw-phe-270-s-state-fact-sheet-tables.xlsx", sheet = "Table S.31")
@@ -275,29 +250,38 @@ year_2007 = year_2007[-1]
 states_2007 = rep(states, each = 5)
 year_states_2007 = paste(year_2007, states_2007, sep= ",")
 
-initialised_age = initialised_age[8:15,]
+initialised_age = initialised_age[8:14,]
 colnames(initialised_age) = c("drug", year_states_2007)
 initialised_age$drug = initialised_age$drug %>% recode("Meth/amphetamine(c)" = "Meth")
-initialised_age$drug = c(paste(initialised_age$drug, "mean_age", sep = "_"))
+# initialised_age$drug = c(paste(initialised_age$drug, "mean_age", sep = "_"))
 
 initialised_age = initialised_age %>% pivot_longer(cols = -drug, names_to = "year, states", values_to = "age")
 initialised_age$age = gsub("[`#]", "", initialised_age$age) %>% 
   gsub("\\`\\`", "",.) %>% gsub("n.p.", NA, .) %>%
   as.numeric()
 
-initialised_age  = initialised_age %>% separate(col = "year, states", into = c("Year", "State"), sep = ",")
+initialised_age  = initialised_age %>% separate(col = "year, states", into = c("year", "state"), sep = ",")
 initialised_age = initialised_age %>% pivot_wider(names_from = drug, values_from = age)
-initialised_age
+initialised_age$label = "mean_age"
 ```
 
 
 ```{r}
-drug_type_age = left_join(recent_drug_type, initialised_age, by= c("Year", "State"))
+drug_type_age = rbind(recent_drug_type, initialised_age)
 drug_type_age
+
+folder_path <- "data/cleaned_data"
+file_name <- "drug_type_age_wo_ketamine.csv"
+write.csv(drug_type_age, file.path(folder_path, file_name), row.names = FALSE)
+```
+```{r}
+drug_subset = drug_type_age %>% select(c(year, state, Cannabis, label)) %>% filter(state =="New South Wales")
+drug_subset_wide = drug_subset %>% pivot_wider(names_from = label, values_from = Cannabis)
 ```
 
 ```{r, fig.width= 14}
-nsw_drug_type_age = drug_type_age %>% filter(State == "New South Wales") %>% select(Year, Cannabis, Cannabis_mean_age)
+library(plotly)
+nsw_drug_type_age = drug_type_age %>% filter(state == "New South Wales") %>% select(year, Cannabis, Cannabis_mean_age)
 max_mean_age = max(nsw_drug_type_age$Cannabis_mean_age)
 max_usage = max(nsw_drug_type_age$Cannabis)
 fig = plot_ly(data = nsw_drug_type_age,
@@ -347,7 +331,7 @@ fig = fig %>% layout(title = list(text ="Proportion of recent users and average 
                                   tickfont = list(color = "lightgrey"),
                                   gridcolor = 'rgba(200, 200, 200, 0.2)',
                                   showline = TRUE),
-                     margin = list(r = 80, t = 50),
+                     margin = list(r = 80, t = 50, b =60),
                      legend = list(font = list(color = "lightgrey")))
 fig %>%
   layout(legend = list(orientation = 'h'))
@@ -369,9 +353,19 @@ for (col in colnames(age_group[-1])) {
 
 age_group = age_group %>% pivot_longer(cols = -Age_group, names_to = "year, states", values_to = "proportion")
 age_group = age_group %>% separate(col = "year, states", into = c("Year", "State"), sep = ",")
-age_group_wide = age_group %>% pivot_wider(names_from =Age_group, values_from = proportion)
+colnames(age_group) = c("age_group", "year", "state", "proportion")
+
+age_group_wide = age_group %>% pivot_wider(names_from =age_group, values_from = proportion)
+```
+
+```{r}
+file_name <- "age_group.csv"
+folder_path <- "data/cleaned_data"
+
+# write.csv(age_group_wide, file.path(folder_path, file_name), row.names = FALSE)
 
 ```
+
 ```{r}
 age_group_nsw = age_group %>% filter(State == "New South Wales")
 
@@ -380,11 +374,11 @@ ggplot(data = age_group_nsw) + geom_line(aes(x = Year, y = proportion, color = A
 ```
 
 ```{r}
-age_group_nsw = filter(age_group_wide, State == "New South Wales")
+age_group_nsw = filter(age_group_wide, state == "New South Wales")
 max_age_nsw = age_group_nsw[,3:9] %>% as.matrix() %>% max()
 
 plot_ly() %>% add_trace(data = age_group_nsw, 
-                        x = ~Year,
+                        x = ~year,
                         y = ~`14–17`,
                         type ="scatter",
                         mode = "lines",
@@ -392,7 +386,7 @@ plot_ly() %>% add_trace(data = age_group_nsw,
                         connectgaps = TRUE,
                         line = list(color = "#fd7f6f", width = 3)) %>% 
   add_trace(data = age_group_nsw, 
-            x = ~Year,
+            x = ~year,
             y = ~`18–24`,
             type ="scatter",
             mode = "lines",
@@ -400,7 +394,7 @@ plot_ly() %>% add_trace(data = age_group_nsw,
             connectgaps = TRUE,
             line = list(color = "#7eb0d5", width = 3)) %>%
   add_trace(data = age_group_nsw, 
-            x = ~Year,
+            x = ~year,
             y = ~`25–29`,
             type ="scatter",
             mode = "lines",
@@ -408,7 +402,7 @@ plot_ly() %>% add_trace(data = age_group_nsw,
             connectgaps = TRUE,
             line = list(color = "#b2e061", width = 3)) %>%
   add_trace(data = age_group_nsw, 
-            x = ~Year,
+            x = ~year,
             y = ~`30–39`,
             type ="scatter",
             mode = "lines",
@@ -416,7 +410,7 @@ plot_ly() %>% add_trace(data = age_group_nsw,
             connectgaps = TRUE,
             line = list(color = "#bd7ebe", width = 3)) %>%
   add_trace(data = age_group_nsw, 
-            x = ~Year,
+            x = ~year,
             y = ~`40–49`,
             type ="scatter",
             mode = "lines",
@@ -424,7 +418,7 @@ plot_ly() %>% add_trace(data = age_group_nsw,
             connectgaps = TRUE,
             line = list(color = '#ffb55a', width = 3)) %>%
   add_trace(data = age_group_nsw,
-            x = ~Year,
+            x = ~year,
             y = ~`50–59`,
             type ="scatter",
             mode = "lines",
@@ -432,7 +426,7 @@ plot_ly() %>% add_trace(data = age_group_nsw,
             connectgaps = TRUE,
             line = list(color = "#fdcce5", width = 3)) %>%
   add_trace(data = age_group_nsw,
-            x = ~Year,
+            x = ~year,
             y = ~`60+`,
             type ="scatter",
             mode = "lines",
@@ -478,20 +472,26 @@ for (col in colnames(recent_gender[-1])) {
 }
 colnames(recent_gender) = c("gender", year_states_2007)
 recent_gender = recent_gender %>% pivot_longer(cols = -gender, names_to = "year, states", values_to = "proportion")
-recent_gender = recent_gender %>% separate(col = `year, states`, into = c("Year", "State"), sep = ",")
+recent_gender = recent_gender %>% separate(col = `year, states`, into = c("year", "state"), sep = ",")
 recent_gender = recent_gender %>% pivot_wider(names_from = gender, values_from = proportion)
 ```
 
 ```{r}
-gender_nsw = recent_gender %>% filter(State == "New South Wales")
+file_name <- "gender.csv"
+# write.csv(recent_gender, file.path(folder_path, file_name), row.names = FALSE)
+```
+
+```{r}
+gender_nsw = recent_gender %>% filter(state == "New South Wales")
+value = max(gender_nsw$Males, gender_nsw$Females)
 plot_ly(data = gender_nsw) %>% 
-  add_trace(x = ~Year, 
+  add_trace(x = ~year, 
             y = ~Males,
             type = 'bar',
             name = "Male",
             text = ~Males,
             marker = list(color = '#7eb0d5')) %>%
-  add_trace(x = ~Year,
+  add_trace(x = ~year,
             y = ~Females,
             type = 'bar',
             name = "Female",
@@ -520,3 +520,8 @@ plot_ly(data = gender_nsw) %>%
          legend = list(font = list(color = "lightgrey")))
 
 ```
+
+```{r}
+
+```
+
